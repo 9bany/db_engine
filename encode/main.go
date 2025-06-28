@@ -7,24 +7,31 @@ import (
 	"log"
 )
 
-type int32Marshaler struct {
-	value int32
+type ValueMarshaler[T any] struct {
+	value T
 }
 
-func (f *int32Marshaler) MarshalBinary() (data []byte, err error) {
+func (f *ValueMarshaler[T]) MarshalBinary() (data []byte, err error) {
 	buffer := bytes.Buffer{}
-	if err := binary.Write(&buffer, binary.LittleEndian, f.value); err != nil {
-		return []byte{}, err
+	switch v := any(f.value).(type) {
+	case string:
+		if err := binary.Write(&buffer, binary.LittleEndian, []byte(v)); err != nil {
+			return []byte{}, err
+		}
+	default:
+		if err := binary.Write(&buffer, binary.LittleEndian, v); err != nil {
+			return []byte{}, err
+		}
 	}
 	return buffer.Bytes(), nil
 }
 
-func (f *int32Marshaler) UnmarshalBinary(data []byte) error {
+func (f *ValueMarshaler[T]) UnmarshalBinary(data []byte) error {
 	return nil
 }
 
 func main() {
-	m := int32Marshaler{value: 23}
+	m := ValueMarshaler[[]byte]{value: []byte("string")}
 	byteData, err := m.MarshalBinary()
 	if err != nil {
 		log.Panic(err)
