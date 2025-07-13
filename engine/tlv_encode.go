@@ -2,7 +2,6 @@ package engine
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 )
 
@@ -45,7 +44,6 @@ func (t *TLVMarshaler[T]) typeBytes() (byte, error) {
 		return TypeInt32, nil
 	case int64:
 		return TypeInt64, nil
-
 	case string:
 		return TypeString, nil
 	case bool:
@@ -76,24 +74,30 @@ func (t *TLVMarshaler[T]) MarshalBinary() ([]byte, error) {
 	buf := bytes.Buffer{}
 
 	// write type
+
 	typeFlag, err := t.typeBytes()
 	if err != nil {
 		return nil, err
 	}
-	err = binary.Write(&buf, binary.LittleEndian, typeFlag)
+	typeMarshaler := ValueMarshaler[byte]{value: typeFlag}
+	typeBuf, err := typeMarshaler.MarshalBinary()
 	if err != nil {
 		return nil, err
 	}
+	buf.Write(typeBuf)
 
 	// write length
 	lengthData, err := t.lengthData()
 	if err != nil {
 		return nil, err
 	}
-	err = binary.Write(&buf, binary.LittleEndian, lengthData)
+	lengthMarshaler := ValueMarshaler[uint32]{value: lengthData}
+	lengthBuf, err := lengthMarshaler.MarshalBinary()
 	if err != nil {
 		return nil, err
 	}
+	buf.Write(lengthBuf)
+	
 	// write value
 	valueBuf, err := t.valueMarshaler.MarshalBinary()
 	if err != nil {
