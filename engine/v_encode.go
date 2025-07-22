@@ -23,15 +23,3 @@ func (f *ValueMarshaler[T]) MarshalBinary() (data []byte, err error) {
 	}
 	return buffer.Bytes(), nil
 }
-
-func (f *ValueMarshaler[T]) UnmarshalBinary(data []byte) error {
-	switch v := any(&f.value).(type) {
-	case *string:
-		*v = string(data)
-	default:
-		if err := binary.Read(bytes.NewBuffer(data), binary.LittleEndian, &f.value); err != nil {
-			return err
-		}
-	}
-	return nil
-}

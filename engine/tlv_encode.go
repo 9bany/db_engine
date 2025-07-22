@@ -74,7 +74,6 @@ func (t *TLVMarshaler[T]) MarshalBinary() ([]byte, error) {
 	buf := bytes.Buffer{}
 
 	// write type
-
 	typeFlag, err := t.typeBytes()
 	if err != nil {
 		return nil, err
@@ -97,7 +96,7 @@ func (t *TLVMarshaler[T]) MarshalBinary() ([]byte, error) {
 		return nil, err
 	}
 	buf.Write(lengthBuf)
-	
+
 	// write value
 	valueBuf, err := t.valueMarshaler.MarshalBinary()
 	if err != nil {
