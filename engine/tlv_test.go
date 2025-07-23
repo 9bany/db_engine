@@ -19,7 +19,7 @@ func TestEncode(t *testing.T) {
 func TestDecode(t *testing.T) {
 	byteData := []byte{2, 10, 0, 0, 0, 104, 101, 108, 108, 111, 32, 98, 97, 110, 121}
 
-	unmarshal := NewTLVUnmarshaler[string]()
+	unmarshal := NewTLVUnmarshaler[string](NewValueUnmarshaler[string]())
 	unmarshal.UnmarshalBinary(byteData)
 
 	assert.Equal(t, "hello bany", unmarshal.Value)
