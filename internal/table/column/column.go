@@ -9,7 +9,17 @@ type ColumnOptions struct {
 }
 
 type Column struct {
-	name     [ColumnNameLength]byte
+	Name     [ColumnNameLength]byte
 	dataType byte
 	opts     ColumnOptions
+}
+
+func NewColumn(name string, dataType byte, opts ColumnOptions) *Column {
+	var colName [ColumnNameLength]byte
+	copy(colName[:], name)
+	return &Column{
+		Name:     colName,
+		dataType: dataType,
+		opts:     opts,
+	}
 }
