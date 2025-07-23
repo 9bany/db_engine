@@ -48,14 +48,6 @@ func (t *TLVUnmarshaler[T]) UnmarshalBinary(data []byte) error {
 	return nil
 }
 
-type UnsupportedDataTypeError struct {
-	dataType string
-}
-
-func (u *UnsupportedDataTypeError) Error() string {
-	return fmt.Sprintf("unsupported data type %s", u.dataType)
-}
-
 func NewTLVMarshaler[T any](value T) *TLVMarshaler[T] {
 	return &TLVMarshaler[T]{
 		value:          value,
