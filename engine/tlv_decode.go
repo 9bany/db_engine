@@ -8,9 +8,9 @@ type TLVUnmarshaler[T any] struct {
 	BytesRead   uint32
 }
 
-func NewTLVUnmarshaler[T any]() *TLVUnmarshaler[T] {
+func NewTLVUnmarshaler[T any](u *ValueUnmarshaler[T]) *TLVUnmarshaler[T] {
 	return &TLVUnmarshaler[T]{
-		unmarshaler: &ValueUnmarshaler[T]{},
+		unmarshaler: u,
 	}
 }
 
@@ -20,7 +20,7 @@ func (t *TLVUnmarshaler[T]) UnmarshalBinary(data []byte) error {
 	if err != nil {
 		return err
 	}
-	t.dataType = typeUnmarshal.value
+	t.dataType = typeUnmarshal.Value
 
 	t.BytesRead += 1
 
@@ -29,14 +29,14 @@ func (t *TLVUnmarshaler[T]) UnmarshalBinary(data []byte) error {
 	if err != nil {
 		return err
 	}
-	t.length = lengthUnmarshal.value
+	t.length = lengthUnmarshal.Value
 	t.BytesRead += 4
 
 	err = t.unmarshaler.UnmarshalBinary(data[t.BytesRead:])
 	if err != nil {
 
 	}
-	t.Value = t.unmarshaler.value
+	t.Value = t.unmarshaler.Value
 	t.BytesRead += t.length
 	return nil
 }

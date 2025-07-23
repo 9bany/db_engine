@@ -3,17 +3,8 @@ package engine
 import (
 	"bytes"
 	"fmt"
-)
 
-var (
-	TypeInt64  byte = 1
-	TypeString byte = 2
-	TypeByte   byte = 3
-	TypeBool   byte = 4
-	TypeInt32  byte = 5
-
-	TypeCollumnDefinetion = 99
-	TypeRecord            = 100
+	"github.com/9bany/db/types"
 )
 
 type UnsupportedDataTypeError struct {
@@ -39,15 +30,15 @@ type TLVMarshaler[T any] struct {
 func (t *TLVMarshaler[T]) typeBytes() (byte, error) {
 	switch v := any(t.value).(type) {
 	case byte:
-		return TypeByte, nil
+		return types.TypeByte, nil
 	case int32:
-		return TypeInt32, nil
+		return types.TypeInt32, nil
 	case int64:
-		return TypeInt64, nil
+		return types.TypeInt64, nil
 	case string:
-		return TypeString, nil
+		return types.TypeString, nil
 	case bool:
-		return TypeBool, nil
+		return types.TypeBool, nil
 	default:
 		return 0, &UnsupportedDataTypeError{dataType: fmt.Sprint(v)}
 	}

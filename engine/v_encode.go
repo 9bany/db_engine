@@ -5,6 +5,10 @@ import (
 	"encoding/binary"
 )
 
+func NewValueMarshaler[T any](value T) *ValueMarshaler[T] {
+	return &ValueMarshaler[T]{value: value}
+}
+
 type ValueMarshaler[T any] struct {
 	value T
 }
