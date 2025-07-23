@@ -1,17 +1,10 @@
 package main
 
 import (
-	"fmt"
-
-	"github.com/9bany/db/engine"
+	"log"
 )
 
 func main() {
 
-	tlv := engine.NewTLVMarshaler("ohmy")
-	data, err := tlv.MarshalBinary()
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println(data)
+	log.Println("Starting the database engine...")
 }
