@@ -61,7 +61,7 @@ func (db *Database) CreateTable(name string,
 		return nil, NewCannotCreateTableError(err, name)
 	}
 
-	err = t.WriteColumnDefinitions()
+	err = t.WriteColumnDefinitions(f)
 	if err != nil {
 		return nil, NewCannotCreateTableError(err, name)
 	}

@@ -8,6 +8,14 @@ import (
 	"github.com/9bany/db/internal/platform/types"
 )
 
+func NewColumnDefinitionMarshaler(name [64]byte, dataType byte, allowNull bool) *ColumnDefinitionMarshaler {
+	return &ColumnDefinitionMarshaler{
+		Name:      name,
+		DataType:  dataType,
+		AllowNull: allowNull,
+	}
+}
+
 type ColumnDefinitionMarshaler struct {
 	Name      [64]byte
 	DataType  byte
@@ -76,7 +84,7 @@ func (c *ColumnDefinitionMarshaler) UnmarshalBinary(data []byte) error {
 	}
 	n += types.LenInt32
 
-	nameTLV := encoding.NewTLVUnmarshaler[string](strUnmarshaler)
+	nameTLV := encoding.NewTLVUnmarshaler(strUnmarshaler)
 	err := nameTLV.UnmarshalBinary(data[n:])
 	if err != nil {
 		return fmt.Errorf("ColumnDefinitionMarshaler.UnmarshalBinary: %w", err)
@@ -84,7 +92,7 @@ func (c *ColumnDefinitionMarshaler) UnmarshalBinary(data []byte) error {
 	name := nameTLV.Value
 	n += nameTLV.BytesRead
 	// unmarshal type
-	typeTLV := encoding.NewTLVUnmarshaler[byte](byteUnmarshaler)
+	typeTLV := encoding.NewTLVUnmarshaler(byteUnmarshaler)
 	err = typeTLV.UnmarshalBinary(data[n:])
 	if err != nil {
 		return fmt.Errorf("ColumnDefinitionMarshaler.UnmarshalBinary: %w", err)
@@ -92,7 +100,7 @@ func (c *ColumnDefinitionMarshaler) UnmarshalBinary(data []byte) error {
 	dataTypeVal := typeTLV.Value
 	n += typeTLV.BytesRead
 	// unmarshal allow null
-	allowNullTLV := encoding.NewTLVUnmarshaler[byte](byteUnmarshaler)
+	allowNullTLV := encoding.NewTLVUnmarshaler(byteUnmarshaler)
 	err = allowNullTLV.UnmarshalBinary(data[n:])
 	if err != nil {
 		return fmt.Errorf("ColumnDefinitionMarshaler.UnmarshalBinary: %w", err)

@@ -1,10 +1,12 @@
 package table
 
 import (
+	"fmt"
 	"io"
 	"os"
 
 	"github.com/9bany/db/internal/table/column"
+	columnio "github.com/9bany/db/internal/table/column/io"
 )
 
 var FileExtension string = ".bin"
@@ -39,7 +41,17 @@ func NewTableWithColumns(f *os.File, columns Columns, columnNames []string) (*Ta
 	}, nil
 }
 
-type ColumnDefinitionWriter struct {
-	w io.Writer
+func (t *Table) WriteColumnDefinitions(w io.Writer) error {
+	for _, col := range t.columnNames {
+		b, err := t.columns[col].MarshalBinary()
+		if err != nil {
+			return fmt.Errorf("Table.WriteColumnDefinitions: %w", err)
+		}
+		fmt.Println(b)
+		writer := columnio.NewColumnDefinitionWriter(w)
+		if n, err := writer.Write(b); n < len(b) || err != nil {
+			return fmt.Errorf("Table.WriteColumnDefinitions: %w", err)
+		}
+	}
+	return nil
 }
-
