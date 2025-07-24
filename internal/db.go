@@ -46,7 +46,9 @@ func CreateDatabase(name string) (*Database, error) {
 func (db *Database) CreateTable(name string,
 	columnNames []string,
 	columns table.Columns) (*table.Table, error) {
-	path := path(name) + table.FileExtension
+
+	path := filepath.Join(path(db.name), name+table.FileExtension)
+
 	if _, err := os.Open(path); err == nil {
 		return nil, NewTableAlreadyExistsError(name)
 	}
