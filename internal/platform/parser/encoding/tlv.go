@@ -2,7 +2,6 @@ package encoding
 
 import (
 	"bytes"
-	"fmt"
 
 	"github.com/9bany/db/internal/platform/types"
 )
@@ -60,45 +59,11 @@ type TLVMarshaler[T any] struct {
 	valueMarshaler *ValueMarshaler[T]
 }
 
-func (t *TLVMarshaler[T]) typeBytes() (byte, error) {
-	switch v := any(t.value).(type) {
-	case byte:
-		return types.TypeByte, nil
-	case int32:
-		return types.TypeInt32, nil
-	case int64:
-		return types.TypeInt64, nil
-	case string:
-		return types.TypeString, nil
-	case bool:
-		return types.TypeBool, nil
-	default:
-		return 0, &UnsupportedDataTypeError{dataType: fmt.Sprint(v)}
-	}
-}
-
-func (t *TLVMarshaler[T]) lengthData() (uint32, error) {
-	switch v := any(t.value).(type) {
-	case byte:
-		return 1, nil
-	case int32:
-		return 4, nil
-	case int64:
-		return 8, nil
-	case string:
-		return uint32(len(v)), nil
-	case bool:
-		return 1, nil
-	default:
-		return 0, &UnsupportedDataTypeError{dataType: fmt.Sprint(v)}
-	}
-}
-
 func (t *TLVMarshaler[T]) MarshalBinary() ([]byte, error) {
 	buf := bytes.Buffer{}
 
 	// write type
-	typeFlag, err := t.typeBytes()
+	typeFlag, err := types.TypeBytes(t.value)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +75,7 @@ func (t *TLVMarshaler[T]) MarshalBinary() ([]byte, error) {
 	buf.Write(typeBuf)
 
 	// write length
-	lengthData, err := t.lengthData()
+	lengthData, err := types.LengthData(t.value)
 	if err != nil {
 		return nil, err
 	}
@@ -130,4 +95,12 @@ func (t *TLVMarshaler[T]) MarshalBinary() ([]byte, error) {
 	buf.Write(valueBuf)
 
 	return buf.Bytes(), nil
+}
+
+func (t *TLVMarshaler[T]) TLVLength() (uint32, error) {
+	length, err := types.LengthData(t.value)
+	if err != nil {
+		return 0, err
+	}
+	return types.LenByte + types.LenInt32 + length, nil
 }

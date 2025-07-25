@@ -1,5 +1,7 @@
 package types
 
+import "fmt"
+
 const (
 	TypeInt64  byte = 1
 	TypeString byte = 2
@@ -16,3 +18,37 @@ const (
 	LenInt32 = 4
 	LenInt64 = 8
 )
+
+func TypeBytes(value any) (byte, error) {
+	switch v := any(value).(type) {
+	case byte:
+		return TypeByte, nil
+	case int32:
+		return TypeInt32, nil
+	case int64:
+		return TypeInt64, nil
+	case string:
+		return TypeString, nil
+	case bool:
+		return TypeBool, nil
+	default:
+		return 0, &UnsupportedDataTypeError{DataType: fmt.Sprint(v)}
+	}
+}
+
+func LengthData(value any) (uint32, error) {
+	switch v := any(value).(type) {
+	case byte:
+		return 1, nil
+	case int32:
+		return 4, nil
+	case int64:
+		return 8, nil
+	case string:
+		return uint32(len(v)), nil
+	case bool:
+		return 1, nil
+	default:
+		return 0, &UnsupportedDataTypeError{DataType: fmt.Sprint(v)}
+	}
+}

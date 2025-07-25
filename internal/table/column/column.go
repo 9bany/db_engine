@@ -1,6 +1,9 @@
 package column
 
-import "github.com/9bany/db/internal/table/column/encoding"
+import (
+	"github.com/9bany/db/internal/platform/types"
+	"github.com/9bany/db/internal/table/column/encoding"
+)
 
 const (
 	ColumnNameLength byte = 64
@@ -36,4 +39,18 @@ func (c *Column) MarshalBinary() ([]byte, error) {
 
 func (c *Column) UnmarshalBinary(buf []byte) error {
 	return c.unmarshaler.UnmarshalBinary(buf)
+}
+
+func (c *Column) ValidateValue(value interface{}) error {
+	if value == nil && c.opts.Nullable {
+		return nil
+	}
+	typeByte, err := types.TypeBytes(value)
+	if err != nil {
+		return err
+	}
+	if typeByte != c.dataType {
+		return &types.UnsupportedDataTypeError{DataType: string(typeByte)}
+	}
+	return nil
 }
