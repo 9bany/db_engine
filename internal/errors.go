@@ -64,3 +64,15 @@ type CannotReadTableError struct {
 func (e *CannotReadTableError) Error() string {
 	return fmt.Sprintf("cannot read table %s: %v", e.name, e.err)
 }
+
+func NewDatabaseDoesNotExistError(name string) *DatabaseDoesNotExistError {
+	return &DatabaseDoesNotExistError{name: name}
+}
+
+type DatabaseDoesNotExistError struct {
+	name string
+}
+
+func (e *DatabaseDoesNotExistError) Error() string {
+	return fmt.Sprintf("database %s does not exist", e.name)
+}

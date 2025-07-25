@@ -5,7 +5,9 @@ import (
 	"os"
 	"path/filepath"
 
+	parserio "github.com/9bany/db/internal/platform/parser/io"
 	"github.com/9bany/db/internal/table"
+	columnio "github.com/9bany/db/internal/table/column/io"
 )
 
 const (
@@ -43,6 +45,23 @@ func CreateDatabase(name string) (*Database, error) {
 	}, nil
 }
 
+func NewDatabase(name string) (*Database, error) {
+	if !exists(name) {
+		return nil, NewDatabaseDoesNotExistError(name)
+	}
+	db := &Database{
+		name: name,
+		path: path(name),
+	}
+
+	table, err := db.readTables()
+	if err != nil {
+		return nil, fmt.Errorf("NewDatabase: %w", err)
+	}
+	db.Tables = table
+	return db, nil
+}
+
 func (db *Database) CreateTable(name string,
 	columnNames []string,
 	columns table.Columns) (*table.Table, error) {
@@ -70,4 +89,45 @@ func (db *Database) CreateTable(name string,
 	db.Tables[name] = t
 	return t, nil
 
+}
+
+func (db *Database) readTables() (Tables, error) {
+	entries, err := os.ReadDir(db.path)
+	if err != nil {
+		return nil, fmt.Errorf("readTables: %w", err)
+	}
+
+	tables := make([]*table.Table, 0)
+	for _, e := range entries {
+		if _, err := e.Info(); err != nil {
+			return nil, fmt.Errorf("readTables: %w", err)
+		}
+
+		f, err := os.OpenFile(filepath.Join(db.path, e.Name()), os.O_APPEND|os.O_RDWR, 0644)
+		if err != nil {
+			return nil, fmt.Errorf("readTables: %w", err)
+		}
+
+		r := parserio.NewReader(f)
+		columnDefReader := columnio.NewColumnDefinitionReader(r)
+
+		t, err := table.NewTable(f, r, columnDefReader)
+		if err != nil {
+			return nil, fmt.Errorf("readTables: %w", err)
+		}
+
+		err = t.ReadColumnDefinitions()
+		if err != nil {
+			return nil, fmt.Errorf("readTables: %w", err)
+		}
+
+		tables = append(tables, t)
+	}
+
+	tablesMap := make(Tables)
+	for _, v := range tables {
+		tablesMap[v.Name] = v
+	}
+
+	return tablesMap, nil
 }
