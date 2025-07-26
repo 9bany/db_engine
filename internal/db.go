@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/9bany/db/internal/platform/parser"
 	parserio "github.com/9bany/db/internal/platform/parser/io"
 	"github.com/9bany/db/internal/table"
 	columnio "github.com/9bany/db/internal/table/column/io"
@@ -35,7 +36,8 @@ func CreateDatabase(name string) (*Database, error) {
 	if exists(name) {
 		return nil, NewDatabaseAlreadyExistsError(name)
 	}
-	if err := os.MkdirAll(path(name), 0644); err != nil {
+
+	if err := os.MkdirAll(path(name), 0777); err != nil {
 		return nil, fmt.Errorf("CreateDatabase: %w", err)
 	}
 	return &Database{
@@ -77,6 +79,8 @@ func (db *Database) CreateTable(name string,
 		return nil, NewCannotCreateTableError(err, name)
 	}
 
+	recParser := parser.NewRecordParser(f, columnNames)
+
 	t, err := table.NewTableWithColumns(f, columns, columnNames)
 	if err != nil {
 		return nil, NewCannotCreateTableError(err, name)
@@ -87,6 +91,12 @@ func (db *Database) CreateTable(name string,
 		return nil, NewCannotCreateTableError(err, name)
 	}
 	db.Tables[name] = t
+
+	err = t.SetRecordParser(recParser)
+	if err != nil {
+		return nil, NewCannotCreateTableError(err, name)
+	}
+
 	return t, nil
 
 }
@@ -118,6 +128,9 @@ func (db *Database) readTables() (Tables, error) {
 		err = t.ReadColumnDefinitions()
 		if err != nil {
 			return nil, fmt.Errorf("readTables: %w", err)
+		}
+		if err = t.SetRecordParser(parser.NewRecordParser(f, t.ColumnNames())); err != nil {
+			return nil, fmt.Errorf("Database.readTables: %w", err)
 		}
 		tables = append(tables, t)
 	}

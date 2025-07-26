@@ -44,6 +44,9 @@ func (r *RecordParser) Parse() error {
 	read := parserio.NewReader(r.file)
 	t, err := read.ReadByte()
 	if err != nil {
+		if err == io.EOF {
+			return io.EOF
+		}
 		return fmt.Errorf("RecordParser.Parse: %w", err)
 	}
 	if t != types.TypeRecord {

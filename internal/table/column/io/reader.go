@@ -31,7 +31,7 @@ func (r *ColumnDefinitionReader) Read(b []byte) (int, error) {
 	}
 
 	if dataType != types.TypeColumnDefinition {
-		return 0, fmt.Errorf("ColumnDefinitionReader.Read: expected data type %d, got %d", types.TypeColumnDefinition, dataType)
+		return buf.Len(), io.EOF
 	}
 	buf.WriteByte(dataType)
 

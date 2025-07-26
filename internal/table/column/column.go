@@ -1,6 +1,7 @@
 package column
 
 import (
+	"github.com/9bany/db/internal/platform/bytes"
 	"github.com/9bany/db/internal/platform/types"
 	"github.com/9bany/db/internal/table/column/encoding"
 )
@@ -59,4 +60,12 @@ func (c *Column) ValidateValue(value interface{}) error {
 		return &types.UnsupportedDataTypeError{DataType: string(typeByte)}
 	}
 	return nil
+}
+func (c *Column) NameToStr() string {
+	trimmed := bytes.TrimZeroBytes(c.Name[:])
+	str := ""
+	for _, v := range trimmed {
+		str += string(v)
+	}
+	return str
 }

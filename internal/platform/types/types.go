@@ -36,6 +36,23 @@ func TypeBytes(value any) (byte, error) {
 	}
 }
 
+func TypeName(value any) string {
+	switch any(value).(type) {
+	case byte:
+		return "TypeByte"
+	case int32:
+		return "TypeInt32"
+	case int64:
+		return "TypeInt64"
+	case string:
+		return "TypeString"
+	case bool:
+		return "TypeBool"
+	default:
+		return "Unsupported"
+	}
+}
+
 func LengthData(value any) (uint32, error) {
 	switch v := any(value).(type) {
 	case byte:
