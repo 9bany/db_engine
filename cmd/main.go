@@ -47,21 +47,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error opening database: %v", err)
 	}
-	t1 := db1.Tables["tb_user"]
-	// result, err := t1.Insert(map[string]interface{}{
-	// 	"id":       int32(1),
-	// 	"username": "chanchan",
-	// })
-	// result, err = t1.Insert(map[string]interface{}{
-	// 	"id":       int32(2),
-	// 	"username": "bany",
-	// })
-	result, err := t1.Select(map[string]interface{}{
-		"username": "chanchan",
+
+	result, err := db1.Tables["tb_user"].Select(map[string]interface{}{
+		"username": "chaniuxinhgai",
 	})
 
-	// result, err := t1.Delete(map[string]interface{}{
-	// 	"username": "bany",
+	// result, err := db1.Tables["tb_user"].Update(map[string]interface{}{
+	// 	"username": "chanchan",
+	// }, map[string]interface{}{
+	// 	"username": "chaniuxinhgai",
 	// })
 	if err != nil {
 		log.Fatal(err)

@@ -276,6 +276,68 @@ func (t *Table) Delete(whereStmt map[string]interface{}) (int, error) {
 	return t.markRecordDeleted(deletableRecords)
 }
 
+func (t *Table) Update(
+	whereStmt map[string]interface{},
+	values map[string]interface{},
+) (int, error) {
+	if err := t.ensureFilePointer(); err != nil {
+		return 0, fmt.Errorf("Table.Update: %w", err)
+	}
+	if err := t.validateWhereStmt(whereStmt); err != nil {
+		return 0, fmt.Errorf("Table.Update: %w", err)
+	}
+
+	deletableRecords := make([]*DeletableRecord, 0)
+	rawRecords := make([]*parser.RawRecord, 0)
+	for {
+		if err := t.recordParser.Parse(); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return 0, fmt.Errorf("Table.Update: %w", err)
+		}
+
+		rawRecord := t.recordParser.Value
+		if err := t.ensureColumnLength(rawRecord.Values); err != nil {
+			return 0, fmt.Errorf("Table.Update: %w", err)
+		}
+
+		if !t.evaluateWhereStmt(whereStmt, rawRecord.Values) {
+			continue
+		}
+
+		rawRecords = append(rawRecords, rawRecord)
+
+		pos, err := t.file.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return 0, fmt.Errorf("Table.Update: %w", err)
+		}
+		deletableRecords = append(deletableRecords, newDeletableRecord(
+			pos-int64(rawRecord.FullSize),
+			rawRecord.FullSize,
+		))
+	}
+
+	if _, err := t.markRecordDeleted(deletableRecords); err != nil {
+		return 0, fmt.Errorf("Table.Update: %w", err)
+	}
+
+	for _, rawRecord := range rawRecords {
+		updatedRecord := make(map[string]interface{})
+		for col, v := range rawRecord.Values {
+			if value, ok := values[col]; ok {
+				updatedRecord[col] = value
+			} else {
+				updatedRecord[col] = v
+			}
+		}
+		if _, err := t.Insert(updatedRecord); err != nil {
+			return 0, fmt.Errorf("Table.Update: %w", err)
+		}
+	}
+	return len(rawRecords), nil
+}
+
 func (t *Table) ensureFilePointer() error {
 	if _, err := t.file.Seek(0, io.SeekStart); err != nil {
 		return fmt.Errorf("Table.ensureFilePointer: %w", err)
