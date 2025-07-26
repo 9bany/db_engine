@@ -51,7 +51,6 @@ func (r *ColumnDefinitionReader) Read(b []byte) (int, error) {
 
 	buf.Write(col)
 	copy(b, buf.Bytes())
-
 	return buf.Len(), nil
 
 }

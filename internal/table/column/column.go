@@ -17,20 +17,18 @@ func NewColumn(name string, dataType byte, opts ColumnOptions) *Column {
 	var colName [ColumnNameLength]byte
 	copy(colName[:], name)
 	return &Column{
-		Name:        colName,
-		dataType:    dataType,
-		opts:        opts,
-		marshaler:   encoding.NewColumnDefinitionMarshaler(colName, dataType, opts.Nullable),
-		unmarshaler: encoding.NewColumnDefinitionUnmarshaler(colName, dataType, opts.Nullable),
+		Name:      colName,
+		dataType:  dataType,
+		opts:      opts,
+		marshaler: encoding.NewColumnDefinitionMarshaler(colName, dataType, opts.Nullable),
 	}
 }
 
 type Column struct {
-	Name        [ColumnNameLength]byte
-	dataType    byte
-	opts        ColumnOptions
-	marshaler   *encoding.ColumnDefinitionMarshaler
-	unmarshaler *encoding.ColumnDefinitionUnmarshaler
+	Name      [ColumnNameLength]byte
+	dataType  byte
+	opts      ColumnOptions
+	marshaler *encoding.ColumnDefinitionMarshaler
 }
 
 func (c *Column) MarshalBinary() ([]byte, error) {
@@ -38,7 +36,15 @@ func (c *Column) MarshalBinary() ([]byte, error) {
 }
 
 func (c *Column) UnmarshalBinary(buf []byte) error {
-	return c.unmarshaler.UnmarshalBinary(buf)
+	unmarshaler := encoding.NewColumnDefinitionUnmarshaler(c.Name, c.dataType, c.opts.Nullable)
+	err := unmarshaler.UnmarshalBinary(buf)
+	if err != nil {
+		return err
+	}
+	c.Name = unmarshaler.Name
+	c.dataType = unmarshaler.DataType
+	c.opts = ColumnOptions{Nullable: unmarshaler.AllowNull}
+	return nil
 }
 
 func (c *Column) ValidateValue(value interface{}) error {

@@ -1,6 +1,7 @@
 package io
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -39,10 +40,37 @@ func (r *Reader) ReadUint32() (uint32, error) {
 	}
 	return binary.LittleEndian.Uint32(buf), nil
 }
+
 func (r *Reader) ReadByte() (byte, error) {
 	buf := make([]byte, types.LenByte)
 	if _, err := r.Read(buf); err != nil {
 		return 0, err
 	}
 	return buf[0], nil
+}
+
+func (r *Reader) ReadTLV() ([]byte, error) {
+	buf := bytes.Buffer{}
+
+	byteData, err := r.ReadByte()
+	if err != nil {
+		return nil, fmt.Errorf("Reader.ReadTLV: %w", err)
+	}
+	buf.WriteByte(byteData)
+
+	length, err := r.ReadUint32()
+	if err != nil {
+		return nil, fmt.Errorf("Reader.ReadTLV: %w", err)
+	}
+	if err := binary.Write(&buf, binary.LittleEndian, length); err != nil {
+		return nil, fmt.Errorf("Reader.ReadTLV: %w", err)
+	}
+
+	valBuf := make([]byte, length)
+	if _, err := r.Read(valBuf); err != nil {
+		return nil, fmt.Errorf("Reader.ReadTLV: %w", err)
+	}
+	buf.Write(valBuf)
+
+	return buf.Bytes(), nil
 }

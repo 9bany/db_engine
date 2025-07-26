@@ -96,7 +96,6 @@ func (db *Database) readTables() (Tables, error) {
 	if err != nil {
 		return nil, fmt.Errorf("readTables: %w", err)
 	}
-
 	tables := make([]*table.Table, 0)
 	for _, e := range entries {
 		if _, err := e.Info(); err != nil {
@@ -120,7 +119,6 @@ func (db *Database) readTables() (Tables, error) {
 		if err != nil {
 			return nil, fmt.Errorf("readTables: %w", err)
 		}
-
 		tables = append(tables, t)
 	}
 

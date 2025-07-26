@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/9bany/db/internal/platform/parser"
 	"github.com/9bany/db/internal/platform/parser/encoding"
 	parserio "github.com/9bany/db/internal/platform/parser/io"
 	"github.com/9bany/db/internal/platform/types"
@@ -31,6 +32,11 @@ type Table struct {
 	columnNames      []string
 	columns          Columns
 	columnsDefReader *columnio.ColumnDefinitionReader
+	recordParser     *parser.RecordParser
+}
+
+func (t *Table) String() string {
+	return fmt.Sprintf("Table{Name: %s, Columns: %v}", t.Name, t.columnNames)
 }
 
 func NewTable(f *os.File, r *parserio.Reader, columnDefReader *columnio.ColumnDefinitionReader) (*Table, error) {
@@ -80,6 +86,7 @@ func (t *Table) WriteColumnDefinitions(w io.Writer) error {
 		if err != nil {
 			return fmt.Errorf("Table.WriteColumnDefinitions: %w", err)
 		}
+		fmt.Println(b)
 		writer := columnio.NewColumnDefinitionWriter(w)
 		if n, err := writer.Write(b); n < len(b) || err != nil {
 			return fmt.Errorf("Table.WriteColumnDefinitions: %w", err)
@@ -89,11 +96,11 @@ func (t *Table) WriteColumnDefinitions(w io.Writer) error {
 }
 
 func (t *Table) ReadColumnDefinitions() error {
-	if _, err := t.file.Seek(0, io.SeekEnd); err != nil {
+	if _, err := t.file.Seek(0, io.SeekStart); err != nil {
 		return fmt.Errorf("Table.ReadColumnDefinitions: %w", err)
 	}
 	for {
-		buf := make([]byte, 0, 1024)
+		buf := make([]byte, 1024)
 		n, err := t.columnsDefReader.Read(buf)
 		if err != nil {
 			if err == io.EOF {
@@ -110,6 +117,10 @@ func (t *Table) ReadColumnDefinitions() error {
 		t.columns[colName] = &col
 		t.columnNames = append(t.columnNames, colName)
 	}
+	t.recordParser = parser.NewRecordParser(
+		t.file,
+		t.columnNames,
+	)
 	return nil
 }
 
@@ -173,4 +184,35 @@ func (t *Table) Insert(record map[string]interface{}) (int, error) {
 		return 0, fmt.Errorf("Table.Insert: expected to write %d bytes, but wrote %d", buf.Len(), n)
 	}
 	return n, nil
+}
+
+func (t *Table) Select(
+	whereStmt map[string]interface{},
+) ([]map[string]interface{}, error) {
+	// if err := t.ensureFilePointer(); err != nil {
+	// 	return nil, fmt.Errorf("Table.Select: %w", err)
+	// }
+	// if err := t.validateWhereStmt(whereStmt); err != nil {
+	// 	return nil, fmt.Errorf("Table.Select: %w", err)
+	// }
+	results := make([]map[string]interface{}, 0)
+
+	for {
+		err := t.recordParser.Parse()
+		if err == io.EOF {
+			return results, nil
+		}
+		if err != nil {
+			return nil, fmt.Errorf("Table.Select: %w", err)
+		}
+		rawRecord := t.recordParser.Value
+		// if err = t.ensureColumnLength(rawRecord.Values); err != nil {
+		// 	return nil, fmt.Errorf("Table.Select: %w", err)
+		// }
+		// if !t.evaluateWhereStmt(whereStmt, rawRecord.Values) {
+		// 	continue
+		// }
+
+		results = append(results, rawRecord.Values)
+	}
 }
