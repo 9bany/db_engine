@@ -11,12 +11,14 @@ const (
 
 	TypeColumnDefinition byte = 99
 	TypeRecord           byte = 100
+	TypeDeletedRecord    byte = 101
 )
 
 const (
 	LenByte  = 1
 	LenInt32 = 4
 	LenInt64 = 8
+	LenMeta  = 5
 )
 
 func TypeBytes(value any) (byte, error) {

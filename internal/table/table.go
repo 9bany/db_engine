@@ -2,6 +2,7 @@ package table
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"os"
@@ -23,8 +24,17 @@ type Tables []Table
 
 type Columns map[string]*column.Column
 
-func fileNameWithoutExt(f *os.File) string {
-	return strings.TrimSuffix(filepath.Base(f.Name()), filepath.Ext(f.Name()))
+type DeletableRecord struct {
+	offset int64
+	l      uint32
+}
+
+func newDeletableRecord(offset int64,
+	l uint32) *DeletableRecord {
+	return &DeletableRecord{
+		offset: offset,
+		l:      l,
+	}
 }
 
 type Table struct {
@@ -37,8 +47,8 @@ type Table struct {
 	recordParser     *parser.RecordParser
 }
 
-func (t *Table) String() string {
-	return fmt.Sprintf("Table{Name: %s, Columns: %v}", t.Name, t.columnNames)
+func fileNameWithoutExt(f *os.File) string {
+	return strings.TrimSuffix(filepath.Base(f.Name()), filepath.Ext(f.Name()))
 }
 
 func NewTable(f *os.File, r *parserio.Reader, columnDefReader *columnio.ColumnDefinitionReader) (*Table, error) {
@@ -69,6 +79,10 @@ func NewTableWithColumns(f *os.File, columns Columns, columnNames []string) (*Ta
 		columnNames: columnNames,
 		columns:     columns,
 	}, nil
+}
+
+func (t *Table) String() string {
+	return fmt.Sprintf("Table{Name: %s, Columns: %v}", t.Name, t.columnNames)
 }
 
 func (t *Table) validateColumns(record map[string]interface{}) error {
@@ -224,6 +238,44 @@ func (t *Table) Select(
 	}
 }
 
+func (t *Table) Delete(whereStmt map[string]interface{}) (int, error) {
+	if err := t.ensureFilePointer(); err != nil {
+		return 0, fmt.Errorf("Table.Delete: %w", err)
+	}
+	if err := t.validateWhereStmt(whereStmt); err != nil {
+		return 0, fmt.Errorf("Table.Delete: %w", err)
+	}
+
+	deletableRecords := make([]*DeletableRecord, 0)
+	for {
+		if err := t.recordParser.Parse(); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return 0, fmt.Errorf("Table.Delete: %w", err)
+		}
+
+		rawRecord := t.recordParser.Value
+		if err := t.ensureColumnLength(rawRecord.Values); err != nil {
+			return 0, fmt.Errorf("Table.Delete: %w", err)
+		}
+
+		if !t.evaluateWhereStmt(whereStmt, rawRecord.Values) {
+			continue
+		}
+
+		pos, err := t.file.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return 0, fmt.Errorf("Table.Delete: %w", err)
+		}
+		deletableRecords = append(deletableRecords, newDeletableRecord(
+			pos-int64(rawRecord.FullSize),
+			rawRecord.FullSize,
+		))
+	}
+	return t.markRecordDeleted(deletableRecords)
+}
+
 func (t *Table) ensureFilePointer() error {
 	if _, err := t.file.Seek(0, io.SeekStart); err != nil {
 		return fmt.Errorf("Table.ensureFilePointer: %w", err)
@@ -290,4 +342,24 @@ func (t *Table) ensureColumnLength(record map[string]interface{}) error {
 		return column.NewMismatchingColumnsError(len(t.columns), len(record))
 	}
 	return nil
+}
+
+func (t *Table) markRecordDeleted(deleableRecords []*DeletableRecord) (int, error) {
+	for _, rec := range deleableRecords {
+		if _, err := t.file.Seek(rec.offset, io.SeekStart); err != nil {
+			return 0, fmt.Errorf("Table.markRecordsDeleted: %w", err)
+		}
+		if err := binary.Write(t.file, binary.LittleEndian, types.TypeDeletedRecord); err != nil {
+			return 0, fmt.Errorf("Table.markRecordsDeleted: %w", err)
+		}
+		length, err := t.reader.ReadUint32()
+		if err != nil {
+			return 0, fmt.Errorf("Table.markRecordsDeleted: %w", err)
+		}
+		zeroBytes := make([]byte, length)
+		if err = binary.Write(t.file, binary.LittleEndian, zeroBytes); err != nil {
+			return 0, fmt.Errorf("Table.markRecordsDeleted: %w", err)
+		}
+	}
+	return len(deleableRecords), nil
 }

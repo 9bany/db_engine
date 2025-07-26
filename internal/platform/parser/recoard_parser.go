@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 
 	parserio "github.com/9bany/db/internal/platform/parser/io"
@@ -19,7 +20,7 @@ type RawRecord struct {
 func NewRawRecord(size uint32, record map[string]interface{}) *RawRecord {
 	return &RawRecord{
 		Size:     size,
-		FullSize: size,
+		FullSize: size + types.LenMeta,
 		Values:   record,
 	}
 }
@@ -49,8 +50,25 @@ func (r *RecordParser) Parse() error {
 		}
 		return fmt.Errorf("RecordParser.Parse: %w", err)
 	}
-	if t != types.TypeRecord {
+
+	if t != types.TypeRecord && t != types.TypeDeletedRecord {
+		log.Println("RecordParser looix nef", err)
 		return fmt.Errorf("RecordParser.Parse: expected TypeRecord, got %d", t)
+	}
+
+	if t == types.TypeDeletedRecord {
+		if _, err := r.file.Seek(-1*types.LenByte, io.SeekCurrent); err != nil {
+			log.Println("RecordParser looix nef", err)
+			return fmt.Errorf("RecordParser.Parse: %w", err)
+		}
+
+		err = r.skipDeletedRecords()
+		if err != nil {
+			if err == io.EOF {
+				return err
+			}
+			return fmt.Errorf("RecordParser.Parse: %w", err)
+		}
 	}
 
 	record := make(map[string]interface{})
@@ -77,4 +95,28 @@ func (r *RecordParser) Parse() error {
 		record,
 	)
 	return nil
+}
+
+func (r *RecordParser) skipDeletedRecords() error {
+	for {
+		t, err := r.Reader.ReadByte()
+		if err != nil {
+			if err == io.EOF {
+				return err
+			}
+			return fmt.Errorf("RecordParser.Parse: %w", err)
+		}
+		if t == types.TypeDeletedRecord {
+			l, err := r.Reader.ReadUint32()
+			if err != nil {
+				return fmt.Errorf("RecordParser.Parse: %w", err)
+			}
+			if _, err = r.file.Seek(int64(l), io.SeekCurrent); err != nil {
+				return fmt.Errorf("RecordParser.Parse: %w", err)
+			}
+		}
+		if t == types.TypeRecord {
+			return nil
+		}
+	}
 }
