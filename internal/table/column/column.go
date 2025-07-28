@@ -33,18 +33,19 @@ type Column struct {
 }
 
 func (c *Column) MarshalBinary() ([]byte, error) {
-	return c.marshaler.MarshalBinary()
+	marshaler := encoding.NewColumnDefinitionMarshaler(c.Name, c.dataType, c.opts.Nullable)
+	return marshaler.MarshalBinary()
 }
 
 func (c *Column) UnmarshalBinary(buf []byte) error {
-	unmarshaler := encoding.NewColumnDefinitionUnmarshaler(c.Name, c.dataType, c.opts.Nullable)
-	err := unmarshaler.UnmarshalBinary(buf)
+	marshaler := encoding.NewColumnDefinitionMarshaler(c.Name, c.dataType, c.opts.Nullable)
+	err := marshaler.UnmarshalBinary(buf)
 	if err != nil {
 		return err
 	}
-	c.Name = unmarshaler.Name
-	c.dataType = unmarshaler.DataType
-	c.opts = ColumnOptions{Nullable: unmarshaler.AllowNull}
+	c.Name = marshaler.Name
+	c.dataType = marshaler.DataType
+	c.opts = ColumnOptions{Nullable: marshaler.AllowNull}
 	return nil
 }
 
