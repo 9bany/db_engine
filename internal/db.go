@@ -9,6 +9,7 @@ import (
 	parserio "github.com/9bany/db/internal/platform/parser/io"
 	"github.com/9bany/db/internal/table"
 	columnio "github.com/9bany/db/internal/table/column/io"
+	"github.com/9bany/db/internal/table/wal"
 )
 
 const (
@@ -104,30 +105,40 @@ func (db *Database) CreateTable(name string,
 func (db *Database) readTables() (Tables, error) {
 	entries, err := os.ReadDir(db.path)
 	if err != nil {
-		return nil, fmt.Errorf("readTables: %w", err)
+		return nil, fmt.Errorf("Database.readTables: %w", err)
 	}
 	tables := make([]*table.Table, 0)
 	for _, e := range entries {
 		if _, err := e.Info(); err != nil {
-			return nil, fmt.Errorf("readTables: %w", err)
+			return nil, fmt.Errorf("Database.readTables: %w", err)
 		}
 
 		f, err := os.OpenFile(filepath.Join(db.path, e.Name()), os.O_RDWR, 0777)
 		if err != nil {
-			return nil, fmt.Errorf("readTables: %w", err)
+			return nil, fmt.Errorf("Database.readTables: %w", err)
 		}
 
 		r := parserio.NewReader(f)
 		columnDefReader := columnio.NewColumnDefinitionReader(r)
 
-		t, err := table.NewTable(f, r, columnDefReader)
+		tableName, err := table.GetTableName(f)
 		if err != nil {
-			return nil, fmt.Errorf("readTables: %w", err)
+			return nil, fmt.Errorf("Database.readTables: %w", err)
+		}
+
+		writeAheadLog, err := wal.NewWal(db.path, tableName)
+		if err != nil {
+			return nil, fmt.Errorf("Database.readTables: %w", err)
+		}
+
+		t, err := table.NewTable(f, r, columnDefReader, writeAheadLog)
+		if err != nil {
+			return nil, fmt.Errorf("Database.readTables: %w", err)
 		}
 
 		err = t.ReadColumnDefinitions()
 		if err != nil {
-			return nil, fmt.Errorf("readTables: %w", err)
+			return nil, fmt.Errorf("Database.readTables: %w", err)
 		}
 		if err = t.SetRecordParser(parser.NewRecordParser(f, t.ColumnNames())); err != nil {
 			return nil, fmt.Errorf("Database.readTables: %w", err)

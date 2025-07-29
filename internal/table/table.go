@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 
@@ -16,6 +15,8 @@ import (
 	"github.com/9bany/db/internal/platform/types"
 	"github.com/9bany/db/internal/table/column"
 	columnio "github.com/9bany/db/internal/table/column/io"
+	"github.com/9bany/db/internal/table/wal"
+	walencoding "github.com/9bany/db/internal/table/wal/encoding"
 )
 
 var FileExtension string = ".bin"
@@ -38,27 +39,35 @@ func newDeletableRecord(offset int64,
 }
 
 type Table struct {
-	Name             string
-	file             *os.File
-	columnNames      []string
-	columns          Columns
+	Name        string
+	file        *os.File
+	columnNames []string
+	columns     Columns
+
 	reader           *parserio.Reader
 	columnsDefReader *columnio.ColumnDefinitionReader
 	recordParser     *parser.RecordParser
+	wal              *wal.WAL
 }
 
-func fileNameWithoutExt(f *os.File) string {
-	return strings.TrimSuffix(filepath.Base(f.Name()), filepath.Ext(f.Name()))
-}
+func NewTable(f *os.File,
+	r *parserio.Reader,
+	columnDefReader *columnio.ColumnDefinitionReader,
+	wal *wal.WAL) (*Table, error) {
 
-func NewTable(f *os.File, r *parserio.Reader, columnDefReader *columnio.ColumnDefinitionReader) (*Table, error) {
+	tableName, err := GetTableName(f)
+	if err != nil {
+		return nil, fmt.Errorf("NewTable: %w", err)
+	}
+
 	return &Table{
-		Name:             fileNameWithoutExt(f),
+		Name:             tableName,
 		file:             f,
 		reader:           r,
 		columnsDefReader: columnDefReader,
 		columns:          make(Columns),
 		columnNames:      make([]string, 0),
+		wal:              wal,
 	}, nil
 }
 
@@ -196,12 +205,21 @@ func (t *Table) Insert(record map[string]interface{}) (int, error) {
 		buf.Write(b)
 	}
 
+	entry, err := t.wal.AppendLog(walencoding.InsertOps, t.Name, buf.Bytes())
+	if err != nil {
+		return 0, fmt.Errorf("Table.Insert: %w", err)
+	}
+
 	n, err := t.file.Write(buf.Bytes())
 	if err != nil {
 		return 0, fmt.Errorf("Table.Insert: %w", err)
 	}
 	if n != buf.Len() {
 		return 0, columnio.NewIncompleteWriteError(n, buf.Len())
+	}
+
+	if err := t.wal.Commit(entry); err != nil {
+		return 0, fmt.Errorf("Table.Insert: %w", err)
 	}
 
 	return 1, nil
@@ -424,4 +442,17 @@ func (t *Table) markRecordDeleted(deleableRecords []*DeletableRecord) (int, erro
 		}
 	}
 	return len(deleableRecords), nil
+}
+
+func GetTableName(f *os.File) (string, error) {
+	// path/to/db/table.bin
+	parts := strings.Split(f.Name(), ".")
+	if len(parts) != 2 {
+		return "", NewInvalidFilename(f.Name())
+	}
+	filenameParts := strings.Split(parts[0], "/")
+	if len(filenameParts) == 0 {
+		return "", NewInvalidFilename(f.Name())
+	}
+	return filenameParts[len(filenameParts)-1], nil
 }

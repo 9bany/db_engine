@@ -14,6 +14,18 @@ const (
 	InsertOps Ops = "insert"
 )
 
+func NewWalMarshaler(id string,
+	ops Ops,
+	table string,
+	data []byte) *WalMarshaler {
+	return &WalMarshaler{
+		Id:    id,
+		Ops:   ops,
+		Table: table,
+		Data:  data,
+	}
+}
+
 type WalMarshaler struct {
 	Id    string
 	Ops   Ops
@@ -24,7 +36,7 @@ type WalMarshaler struct {
 func (w *WalMarshaler) Marshaler() ([]byte, error) {
 	buf := bytes.Buffer{}
 	// type
-	typeMarshaler := encoding.NewValueMarshaler(types.TypeWAL)
+	typeMarshaler := encoding.NewValueMarshaler(types.TypeWALEntry)
 	typeData, err := typeMarshaler.MarshalBinary()
 	if err != nil {
 		return nil, fmt.Errorf("WalMarshaler.Marshaler: %w", err)

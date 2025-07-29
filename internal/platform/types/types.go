@@ -8,7 +8,9 @@ const (
 	TypeByte   byte = 3
 	TypeBool   byte = 4
 	TypeInt32  byte = 5
-	TypeWAL    byte = 6
+
+	TypeWALEntry      byte = 20
+	TypeWALLastIDItem byte = 21
 
 	TypeColumnDefinition byte = 99
 	TypeRecord           byte = 100
