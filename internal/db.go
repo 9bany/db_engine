@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/9bany/db/internal/platform/parser"
 	parserio "github.com/9bany/db/internal/platform/parser/io"
@@ -62,6 +63,11 @@ func NewDatabase(name string) (*Database, error) {
 		return nil, fmt.Errorf("NewDatabase: %w", err)
 	}
 	db.Tables = table
+	for _, t := range db.Tables {
+		if err := t.RestoreWAL(); err != nil {
+			return nil, fmt.Errorf("NewDatabase: %w", err)
+		}
+	}
 	return db, nil
 }
 
@@ -109,6 +115,12 @@ func (db *Database) readTables() (Tables, error) {
 	}
 	tables := make([]*table.Table, 0)
 	for _, e := range entries {
+		if strings.Contains(e.Name(), "_wal") {
+			continue
+		}
+		if strings.Contains(e.Name(), "_idx") {
+			continue
+		}
 		if _, err := e.Info(); err != nil {
 			return nil, fmt.Errorf("Database.readTables: %w", err)
 		}

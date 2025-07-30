@@ -8,71 +8,99 @@ import (
 	"github.com/9bany/db/internal/platform/types"
 )
 
-func NewLastCommitMashaler(id string,
-	len uint32) *LastCommitMashaler {
-	return &LastCommitMashaler{
+type LastCommitMarshaler struct {
+	ID  string
+	Len uint32
+}
+type LastCommitUnmarshaler struct {
+	ID  string
+	Len uint32
+}
+
+func NewLastCommitMarshaler(id string, len uint32) *LastCommitMarshaler {
+	return &LastCommitMarshaler{
 		ID:  id,
 		Len: len,
 	}
 }
 
-type LastCommitMashaler struct {
-	ID  string
-	Len uint32
-}
-
-func (l *LastCommitMashaler) MarshalBinary() ([]byte, error) {
+func (m *LastCommitMarshaler) MarshalBinary() ([]byte, error) {
 	buf := bytes.Buffer{}
-
 	typeMarshaler := encoding.NewValueMarshaler(types.TypeWALLastIDItem)
-	byteData, err := typeMarshaler.MarshalBinary()
+	typeBuf, err := typeMarshaler.MarshalBinary()
 	if err != nil {
-		return nil, fmt.Errorf("LastCommitMashaler.MarshalBinary: %w", err)
+		return nil, fmt.Errorf("LastCommitMarshaler.MarshalBinary: typeMarshaler%w", err)
 	}
-	buf.Write(byteData)
+	buf.Write(typeBuf)
 
-	lenRecord, err := l.len()
+	// The last commit file contains the length of the last record in the WAL file
+	recordLenMarshaler := encoding.NewTLVMarshaler(m.Len)
+	l, err := recordLenMarshaler.TLVLength()
 	if err != nil {
-		return nil, fmt.Errorf("LastCommitMashaler.MarshalBinary: %w", err)
+		return nil, fmt.Errorf("LastCommitMarshaler.MarshalBinary: recordLenMarshaler %w", err)
 	}
 
-	lenMarshaler := encoding.NewValueMarshaler(lenRecord)
+	lenMarshaler := encoding.NewValueMarshaler(uint32(len(m.ID)) + types.LenByte + types.LenInt32 + l)
 	lenBuf, err := lenMarshaler.MarshalBinary()
 	if err != nil {
-		return nil, fmt.Errorf("LastCommitMashaler.MarshalBinary: %w", err)
+		return nil, fmt.Errorf("LastCommitMarshaler.MarshalBinary: lenMarshaler%w", err)
 	}
-
 	buf.Write(lenBuf)
 
-	idTVLMarshaler := encoding.NewTLVMarshaler(l.ID)
-	idBuf, err := idTVLMarshaler.MarshalBinary()
+	idMarshaler := encoding.NewTLVMarshaler(m.ID)
+	idBuf, err := idMarshaler.MarshalBinary()
 	if err != nil {
-		return nil, fmt.Errorf("LastCommitMashaler.MarshalBinary: %w", err)
+		return nil, fmt.Errorf("LastCommitMarshaler.MarshalBinary: idMarshaler %w", err)
 	}
-
 	buf.Write(idBuf)
 
-	lenTVLMarshaler := encoding.NewTLVMarshaler(l.Len)
-	lenBufData, err := lenTVLMarshaler.MarshalBinary()
+	recordLenBuf, err := recordLenMarshaler.MarshalBinary()
 	if err != nil {
-		return nil, fmt.Errorf("LastCommitMashaler.MarshalBinary: %w", err)
+		return nil, fmt.Errorf("LastCommitMarshaler.MarshalBinary: recordLenBuf %w", err)
 	}
-	buf.Write(lenBufData)
+	buf.Write(recordLenBuf)
 
 	return buf.Bytes(), nil
 }
 
-func (l *LastCommitMashaler) len() (uint32, error) {
-	idTVLMarshaler := encoding.NewTLVMarshaler(l.ID)
-	idLength, err := idTVLMarshaler.TLVLength()
-	if err != nil {
-		return 0, err
-	}
+func NewLastCommitUnmarshaler() *LastCommitUnmarshaler {
+	return &LastCommitUnmarshaler{}
+}
 
-	lenTVLMarshaler := encoding.NewTLVMarshaler(l.Len)
-	lenLength, err := lenTVLMarshaler.TLVLength()
-	if err != nil {
-		return 0, err
+func (u *LastCommitUnmarshaler) UnmarshalBinary(data []byte) error {
+	var bytesRead uint32 = 0
+
+	byteUnmarshaler := encoding.NewValueUnmarshaler[byte]()
+	intUnmarshaler := encoding.NewValueUnmarshaler[uint32]()
+	strUnmarshaler := encoding.NewValueUnmarshaler[string]()
+
+	// type
+	if err := byteUnmarshaler.UnmarshalBinary(data); err != nil {
+		return fmt.Errorf("LastCommitUnmarshaler.UnmarshalBinary: type: %w", err)
 	}
-	return types.LenMeta + idLength + lenLength, nil
+	bytesRead += types.LenByte
+
+	// len
+	if err := intUnmarshaler.UnmarshalBinary(data[bytesRead:]); err != nil {
+		return fmt.Errorf("LastCommitUnmarshaler.UnmarshalBinary: len: %w", err)
+	}
+	bytesRead += types.LenInt32
+
+	// ID
+	idUnmarshaler := encoding.NewTLVUnmarshaler(strUnmarshaler)
+	if err := idUnmarshaler.UnmarshalBinary(data[bytesRead:]); err != nil {
+		return fmt.Errorf("LastCommitUnmarshaler.UnmarshalBinary: ID: %w", err)
+	}
+	u.ID = idUnmarshaler.Value
+	bytesRead += idUnmarshaler.BytesRead
+
+	intUnmarshaler = encoding.NewValueUnmarshaler[uint32]()
+	lenUnmarshaler := encoding.NewTLVUnmarshaler(intUnmarshaler)
+	if err := lenUnmarshaler.UnmarshalBinary(data[bytesRead:]); err != nil {
+		return fmt.Errorf("LastCommitUnmarshaler.UnmarshalBinary: len of last record: %w", err)
+	}
+	u.Len = lenUnmarshaler.Value
+	bytesRead += lenUnmarshaler.BytesRead
+
+	return nil
 }

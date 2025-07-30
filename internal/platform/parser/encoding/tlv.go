@@ -2,6 +2,7 @@ package encoding
 
 import (
 	"bytes"
+	"fmt"
 
 	"github.com/9bany/db/internal/platform/types"
 )
@@ -97,10 +98,19 @@ func (t *TLVMarshaler[T]) MarshalBinary() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (t *TLVMarshaler[T]) TLVLength() (uint32, error) {
-	length, err := types.LengthData(t.value)
-	if err != nil {
-		return 0, err
+func (m *TLVMarshaler[T]) TLVLength() (uint32, error) {
+	switch v := any(m.value).(type) {
+	case byte:
+		return types.LenMeta + types.LenByte, nil
+	case int32, uint32:
+		return types.LenMeta + types.LenInt32, nil
+	case int64:
+		return types.LenMeta + types.LenInt64, nil
+	case bool:
+		return types.LenMeta + types.LenByte, nil
+	case string:
+		return types.LenMeta + uint32(len(v)), nil
+	default:
+		return 0, &UnsupportedDataTypeError{dataType: fmt.Sprintf("%T", v)}
 	}
-	return types.LenByte + types.LenInt32 + length, nil
 }
