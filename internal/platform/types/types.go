@@ -8,6 +8,7 @@ const (
 	TypeByte   byte = 3
 	TypeBool   byte = 4
 	TypeInt32  byte = 5
+	TypePage   byte = 255
 
 	TypeWALEntry      byte = 20
 	TypeWALLastIDItem byte = 21

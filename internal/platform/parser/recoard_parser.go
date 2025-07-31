@@ -54,6 +54,12 @@ func (r *RecordParser) Parse() error {
 		return fmt.Errorf("RecordParser.Parse: expected TypeRecord, got %d", t)
 	}
 
+	if t == types.TypePage {
+		// length of page which is not important
+		_, err = read.ReadUint32()
+		// type of next "thing"
+		t, err = read.ReadByte()
+	}
 	if t == types.TypeDeletedRecord {
 		if _, err := r.file.Seek(-1*types.LenByte, io.SeekCurrent); err != nil {
 			return fmt.Errorf("RecordParser.Parse: %w", err)
