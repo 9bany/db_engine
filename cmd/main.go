@@ -30,7 +30,7 @@ func createDb(dbName string) {
 	log.Println("Table 'tb_user' created successfully")
 }
 
-func readDb(db string) {
+func readDb(db string) *internal.Database {
 	db1, err := internal.NewDatabase(db)
 	if err != nil {
 		log.Fatalf("Error opening database: %v", err)
@@ -38,27 +38,40 @@ func readDb(db string) {
 	t1 := db1.Tables["tb_user"]
 
 	log.Println(t1)
+	return db1
 }
 
 func main() {
 	dbName := "my_db"
 	// createDb(dbName)
-	db1, err := internal.NewDatabase(dbName)
-	if err != nil {
-		log.Fatalf("Error opening database: %v", err)
-	}
+	db1 := readDb(dbName)
 
-	result, err := db1.Tables["tb_user"].Select(map[string]interface{}{
-		"username": "chaniuxinhgai",
-	})
+	// result, _ := db1.Tables["tb_user"].Insert(map[string]interface{}{
+	// 	"id":       int32(2),
+	// 	"username": "bany",
+	// })
 
-	// result, err := db1.Tables["tb_user"].Update(map[string]interface{}{
-	// 	"username": "chanchan",
-	// }, map[string]interface{}{
+	// result, err := db1.Tables["tb_user"].Select(map[string]interface{}{
 	// 	"username": "chaniuxinhgai",
 	// })
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Println(result)
+
+	// // result, err := db1.Tables["tb_user"].Update(map[string]interface{}{
+	// // 	"username": "chanchan",
+	// // }, map[string]interface{}{
+	// // 	"username": "chaniuxinhgai",
+	// // })
+	// log.Println(result)
+	log.Println(db1)
+
+	// lastCommitfile, err := os.OpenFile("test", os.O_APPEND|os.O_RDWR, 0777)
+	// if err != nil {
+	// 	lastCommitfile, err = os.Create("test")
+	// 	if err != nil {
+	// 		log.Fatal("create:", err)
+	// 	}
+	// }
+
+	// if _, err := lastCommitfile.Seek(0, io.SeekStart); err != nil {
+	// 	log.Fatal("seek:", err)
+	// }
 }

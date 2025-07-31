@@ -28,7 +28,7 @@ func TypeBytes(value any) (byte, error) {
 	switch v := any(value).(type) {
 	case byte:
 		return TypeByte, nil
-	case int32:
+	case int32, uint32:
 		return TypeInt32, nil
 	case int64:
 		return TypeInt64, nil
@@ -62,7 +62,7 @@ func LengthData(value any) (uint32, error) {
 	switch v := any(value).(type) {
 	case byte:
 		return 1, nil
-	case int32:
+	case int32, uint32:
 		return 4, nil
 	case int64:
 		return 8, nil

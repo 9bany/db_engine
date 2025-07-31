@@ -1,7 +1,6 @@
 package encoding
 
 import (
-	"log"
 	"testing"
 
 	"github.com/9bany/db/internal/platform/types"
@@ -15,7 +14,6 @@ func TestTLV(t *testing.T) {
 		data, err := marshaler.MarshalBinary()
 		assert.Nil(t, err)
 		assert.Equal(t, types.TypeInt32, data[0])
-		log.Println(data)
 		assert.Equal(t, []byte{5, 4, 0, 0, 0, 42, 0, 0, 0}, data)
 	})
 
@@ -25,6 +23,17 @@ func TestTLV(t *testing.T) {
 		data, _ := marshaler.MarshalBinary()
 
 		unmarshaler := NewTLVUnmarshaler(&ValueUnmarshaler[int32]{})
+		err := unmarshaler.UnmarshalBinary(data)
+		assert.Nil(t, err)
+		assert.Equal(t, value, unmarshaler.Value)
+	})
+
+	t.Run("TestTLVUnmarshaler: string", func(t *testing.T) {
+		value := "123"
+		marshaler := NewTLVMarshaler(value)
+		data, _ := marshaler.MarshalBinary()
+
+		unmarshaler := NewTLVUnmarshaler(&ValueUnmarshaler[string]{})
 		err := unmarshaler.UnmarshalBinary(data)
 		assert.Nil(t, err)
 		assert.Equal(t, value, unmarshaler.Value)

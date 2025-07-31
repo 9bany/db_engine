@@ -205,7 +205,7 @@ func (t *Table) Insert(record map[string]interface{}) (int, error) {
 		buf.Write(b)
 	}
 
-	entry, err := t.wal.AppendLog(walencoding.InsertOps, t.Name, buf.Bytes())
+	entry, err := t.wal.AppendLog(walencoding.OpInsert, t.Name, buf.Bytes())
 	if err != nil {
 		return 0, fmt.Errorf("Table.Insert: %w", err)
 	}
@@ -455,4 +455,36 @@ func GetTableName(f *os.File) (string, error) {
 		return "", NewInvalidFilename(f.Name())
 	}
 	return filenameParts[len(filenameParts)-1], nil
+}
+
+func (t *Table) RestoreWAL() error {
+	if _, err := t.file.Seek(0, io.SeekEnd); err != nil {
+		return fmt.Errorf("Table.RestoreWAL: %w", err)
+	}
+
+	restorableData, err := t.wal.GetRestorableData()
+	if err != nil {
+		return fmt.Errorf("Table.RestoreWAL: %w", err)
+	}
+	// Nothing to restore
+	if restorableData == nil {
+		fmt.Printf("RestoreWAL skipped\n")
+		return nil
+	}
+
+	n, err := t.file.Write(restorableData.Data)
+	if err != nil {
+		return fmt.Errorf("Table.RestoreWAL: %w", err)
+	}
+	if n != len(restorableData.Data) {
+		return fmt.Errorf("Table.RestoreWAL: %w", columnio.NewIncompleteWriteError(len(restorableData.Data), n))
+	}
+
+	fmt.Printf("RestoreWAL wrote %d bytes\n", n)
+
+	if err = t.wal.Commit(restorableData.LastEntry); err != nil {
+		return fmt.Errorf("Table.RestoreWAL: %w", err)
+	}
+
+	return nil
 }

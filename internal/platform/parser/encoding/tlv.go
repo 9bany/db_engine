@@ -2,6 +2,7 @@ package encoding
 
 import (
 	"bytes"
+	"fmt"
 
 	"github.com/9bany/db/internal/platform/types"
 )
@@ -20,30 +21,33 @@ func NewTLVUnmarshaler[T any](u *ValueUnmarshaler[T]) *TLVUnmarshaler[T] {
 	}
 }
 
-func (t *TLVUnmarshaler[T]) UnmarshalBinary(data []byte) error {
-	typeUnmarshal := &ValueUnmarshaler[byte]{}
-	err := typeUnmarshal.UnmarshalBinary(data)
-	if err != nil {
-		return err
+func (u *TLVUnmarshaler[T]) UnmarshalBinary(data []byte) error {
+	u.BytesRead = 0
+
+	byteUnmarshaler := NewValueUnmarshaler[byte]()
+	intUnmarshaler := NewValueUnmarshaler[uint32]()
+
+	// type
+	if err := byteUnmarshaler.UnmarshalBinary(data); err != nil {
+		return fmt.Errorf("TLVUnmarshaler.UnmarshalBinary: %w", err)
 	}
-	t.dataType = typeUnmarshal.Value
+	u.dataType = byteUnmarshaler.Value
+	u.BytesRead += types.LenByte
 
-	t.BytesRead += 1
-
-	lengthUnmarshal := &ValueUnmarshaler[uint32]{}
-	err = lengthUnmarshal.UnmarshalBinary(data[t.BytesRead:])
-	if err != nil {
-		return err
+	// length
+	if err := intUnmarshaler.UnmarshalBinary(data[u.BytesRead:]); err != nil {
+		return fmt.Errorf("TLVUnmarshaler.UnmarshalBinary: %w", err)
 	}
-	t.length = lengthUnmarshal.Value
-	t.BytesRead += 4
+	u.length = intUnmarshaler.Value
+	u.BytesRead += types.LenInt32
 
-	err = t.unmarshaler.UnmarshalBinary(data[t.BytesRead:])
-	if err != nil {
-
+	// value
+	if err := u.unmarshaler.UnmarshalBinary(data[u.BytesRead:(u.BytesRead + u.length)]); err != nil {
+		return fmt.Errorf("TLVUnmarshaler.UnmarshalBinary: %w", err)
 	}
-	t.Value = t.unmarshaler.Value
-	t.BytesRead += t.length
+	u.Value = u.unmarshaler.Value
+	u.BytesRead += u.length
+
 	return nil
 }
 
@@ -97,10 +101,19 @@ func (t *TLVMarshaler[T]) MarshalBinary() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (t *TLVMarshaler[T]) TLVLength() (uint32, error) {
-	length, err := types.LengthData(t.value)
-	if err != nil {
-		return 0, err
+func (m *TLVMarshaler[T]) TLVLength() (uint32, error) {
+	switch v := any(m.value).(type) {
+	case byte:
+		return types.LenMeta + types.LenByte, nil
+	case int32, uint32:
+		return types.LenMeta + types.LenInt32, nil
+	case int64:
+		return types.LenMeta + types.LenInt64, nil
+	case bool:
+		return types.LenMeta + types.LenByte, nil
+	case string:
+		return types.LenMeta + uint32(len(v)), nil
+	default:
+		return 0, &UnsupportedDataTypeError{dataType: fmt.Sprintf("%T", v)}
 	}
-	return types.LenByte + types.LenInt32 + length, nil
 }

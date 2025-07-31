@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 
 	parserio "github.com/9bany/db/internal/platform/parser/io"
@@ -52,13 +51,11 @@ func (r *RecordParser) Parse() error {
 	}
 
 	if t != types.TypeRecord && t != types.TypeDeletedRecord {
-		log.Println("RecordParser looix nef", err)
 		return fmt.Errorf("RecordParser.Parse: expected TypeRecord, got %d", t)
 	}
 
 	if t == types.TypeDeletedRecord {
 		if _, err := r.file.Seek(-1*types.LenByte, io.SeekCurrent); err != nil {
-			log.Println("RecordParser looix nef", err)
 			return fmt.Errorf("RecordParser.Parse: %w", err)
 		}
 
