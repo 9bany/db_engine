@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"slices"
 	"strings"
@@ -210,8 +209,6 @@ func (t *Table) Insert(record map[string]interface{}) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("Table.Insert: %w", err)
 	}
-
-	log.Fatal("ok")
 
 	n, err := t.file.Write(buf.Bytes())
 	if err != nil {
@@ -475,7 +472,6 @@ func (t *Table) RestoreWAL() error {
 		return nil
 	}
 
-	log.Println(len(restorableData.Data))
 	n, err := t.file.Write(restorableData.Data)
 	if err != nil {
 		return fmt.Errorf("Table.RestoreWAL: %w", err)

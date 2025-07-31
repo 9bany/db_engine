@@ -29,21 +29,19 @@ func (m *LastCommitMarshaler) MarshalBinary() ([]byte, error) {
 	typeMarshaler := encoding.NewValueMarshaler(types.TypeWALLastIDItem)
 	typeBuf, err := typeMarshaler.MarshalBinary()
 	if err != nil {
-		return nil, fmt.Errorf("LastCommitMarshaler.MarshalBinary: typeMarshaler%w", err)
+		return nil, fmt.Errorf("LastCommitMarshaler.MarshalBinary: typeMarshaler %w", err)
 	}
 	buf.Write(typeBuf)
 
-	// The last commit file contains the length of the last record in the WAL file
-	recordLenMarshaler := encoding.NewTLVMarshaler(m.Len)
-	l, err := recordLenMarshaler.TLVLength()
+	lenValue, err := m.len()
 	if err != nil {
-		return nil, fmt.Errorf("LastCommitMarshaler.MarshalBinary: recordLenMarshaler %w", err)
+		return nil, fmt.Errorf("LastCommitMarshaler.MarshalBinary: getLenValue %w", err)
 	}
 
-	lenMarshaler := encoding.NewValueMarshaler(uint32(len(m.ID)) + types.LenByte + types.LenInt32 + l)
+	lenMarshaler := encoding.NewValueMarshaler(lenValue)
 	lenBuf, err := lenMarshaler.MarshalBinary()
 	if err != nil {
-		return nil, fmt.Errorf("LastCommitMarshaler.MarshalBinary: lenMarshaler%w", err)
+		return nil, fmt.Errorf("LastCommitMarshaler.MarshalBinary: lenMarshaler %w", err)
 	}
 	buf.Write(lenBuf)
 
@@ -52,8 +50,10 @@ func (m *LastCommitMarshaler) MarshalBinary() ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("LastCommitMarshaler.MarshalBinary: idMarshaler %w", err)
 	}
+
 	buf.Write(idBuf)
 
+	recordLenMarshaler := encoding.NewTLVMarshaler(m.Len)
 	recordLenBuf, err := recordLenMarshaler.MarshalBinary()
 	if err != nil {
 		return nil, fmt.Errorf("LastCommitMarshaler.MarshalBinary: recordLenBuf %w", err)
@@ -61,6 +61,22 @@ func (m *LastCommitMarshaler) MarshalBinary() ([]byte, error) {
 	buf.Write(recordLenBuf)
 
 	return buf.Bytes(), nil
+}
+
+func (l *LastCommitMarshaler) len() (uint32, error) {
+	idTVLMarshaler := encoding.NewTLVMarshaler(l.ID)
+	idLength, err := idTVLMarshaler.TLVLength()
+	if err != nil {
+		return 0, err
+	}
+
+	lenTVLMarshaler := encoding.NewTLVMarshaler(l.Len)
+	lenLength, err := lenTVLMarshaler.TLVLength()
+	if err != nil {
+		return 0, err
+	}
+	value := types.LenMeta + idLength + lenLength
+	return value, nil
 }
 
 func NewLastCommitUnmarshaler() *LastCommitUnmarshaler {
@@ -72,7 +88,6 @@ func (u *LastCommitUnmarshaler) UnmarshalBinary(data []byte) error {
 
 	byteUnmarshaler := encoding.NewValueUnmarshaler[byte]()
 	intUnmarshaler := encoding.NewValueUnmarshaler[uint32]()
-	strUnmarshaler := encoding.NewValueUnmarshaler[string]()
 
 	// type
 	if err := byteUnmarshaler.UnmarshalBinary(data); err != nil {
@@ -87,7 +102,7 @@ func (u *LastCommitUnmarshaler) UnmarshalBinary(data []byte) error {
 	bytesRead += types.LenInt32
 
 	// ID
-	idUnmarshaler := encoding.NewTLVUnmarshaler(strUnmarshaler)
+	idUnmarshaler := encoding.NewTLVUnmarshaler(&encoding.ValueUnmarshaler[string]{})
 	if err := idUnmarshaler.UnmarshalBinary(data[bytesRead:]); err != nil {
 		return fmt.Errorf("LastCommitUnmarshaler.UnmarshalBinary: ID: %w", err)
 	}

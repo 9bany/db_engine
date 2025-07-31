@@ -89,7 +89,7 @@ func (w *WAL) AppendLog(ops string, table string, data []byte) (*Entry, error) {
 		return nil, fmt.Errorf("WAL.AppendLog: %w", err)
 	}
 
-	return newEntry(id, data), nil
+	return newEntry(id, byteData), nil
 }
 
 func (w *WAL) Commit(entry *Entry) error {
@@ -204,7 +204,6 @@ func (w *WAL) getRestorableData(commitID string) ([]byte, error) {
 	}
 
 	r := platformio.NewReader(w.f)
-
 	commitIDFound := false
 	buf := bytes.Buffer{}
 	for {
@@ -216,7 +215,7 @@ func (w *WAL) getRestorableData(commitID string) ([]byte, error) {
 			return nil, fmt.Errorf("WAL.getRestorableData: %w", err)
 		}
 		if t != types.TypeWALEntry {
-			return nil, fmt.Errorf("WAL.getRestorableData: invalid type got %d but expected %d", t, types.TypeWALEntry)
+			return nil, fmt.Errorf("WAL.getRestorableData: invalid type")
 		}
 
 		length, err := r.ReadUint32()
@@ -251,14 +250,14 @@ func (w *WAL) getRestorableData(commitID string) ([]byte, error) {
 		// We are after the commit so this entry needs to be restored
 
 		// op
-		val, _ = tlvParser.Parse()
+		val, err = tlvParser.Parse()
 		op := val.(string)
 		if op != walencoding.OpInsert {
 			return nil, fmt.Errorf("WAL.getRestorableData: unspoorted operation: %s", op)
 		}
 
 		// table
-		val, _ = tlvParser.Parse()
+		val, err = tlvParser.Parse()
 
 		// data
 		t, err = r.ReadByte()

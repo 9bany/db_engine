@@ -60,6 +60,7 @@ func main() {
 	// // }, map[string]interface{}{
 	// // 	"username": "chaniuxinhgai",
 	// // })
+	// log.Println(result)
 	log.Println(db1)
 
 	// lastCommitfile, err := os.OpenFile("test", os.O_APPEND|os.O_RDWR, 0777)
