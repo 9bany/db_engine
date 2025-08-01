@@ -15,9 +15,12 @@ import (
 	"github.com/9bany/db/internal/platform/types"
 	"github.com/9bany/db/internal/table/column"
 	columnio "github.com/9bany/db/internal/table/column/io"
+	"github.com/9bany/db/internal/table/index"
 	"github.com/9bany/db/internal/table/wal"
 	walencoding "github.com/9bany/db/internal/table/wal/encoding"
 )
+
+const PageSize = 128
 
 var FileExtension string = ".bin"
 
@@ -124,7 +127,6 @@ func (t *Table) WriteColumnDefinitions(w io.Writer) error {
 		if err != nil {
 			return fmt.Errorf("Table.WriteColumnDefinitions: %w", err)
 		}
-		fmt.Println(b)
 		writer := columnio.NewColumnDefinitionWriter(w)
 		if n, err := writer.Write(b); n < len(b) || err != nil {
 			return fmt.Errorf("Table.WriteColumnDefinitions: %w", err)
@@ -210,12 +212,9 @@ func (t *Table) Insert(record map[string]interface{}) (int, error) {
 		return 0, fmt.Errorf("Table.Insert: %w", err)
 	}
 
-	n, err := t.file.Write(buf.Bytes())
+	_, err = t.insertIntoPage(buf)
 	if err != nil {
 		return 0, fmt.Errorf("Table.Insert: %w", err)
-	}
-	if n != buf.Len() {
-		return 0, columnio.NewIncompleteWriteError(n, buf.Len())
 	}
 
 	if err := t.wal.Commit(entry); err != nil {
@@ -487,4 +486,119 @@ func (t *Table) RestoreWAL() error {
 	}
 
 	return nil
+}
+func (t *Table) updatePageSize(page int64, offset int32) (e error) {
+	t.file.Seek(page, io.SeekStart)
+	dataType, _ := t.reader.ReadByte()
+	if dataType != types.TypePage {
+		return fmt.Errorf("Table.updatePageSize: unexpected type: %d", dataType)
+	}
+	length, _ := t.reader.ReadUint32()
+	_, err := t.file.Seek(-1*types.LenInt32, io.SeekCurrent)
+	if err != nil {
+		return fmt.Errorf("Table.updatePageSize: %w", err)
+	}
+	var newLength uint32
+	if offset >= 0 {
+		newLength = length + uint32(offset)
+	} else {
+		newLength = length - uint32(-offset)
+	}
+	marshaler := encoding.NewValueMarshaler[uint32](newLength)
+	b, _ := marshaler.MarshalBinary()
+	n, _ := t.file.Write(b)
+	if n != len(b) {
+		return columnio.NewIncompleteWriteError(len(b), n)
+	}
+	return nil
+
+}
+
+func (t *Table) insertIntoPage(buf bytes.Buffer) (*index.Page, error) {
+	page, err := t.seekToNextPage(uint32(buf.Len()))
+	if err != nil {
+		return nil, fmt.Errorf("Table.insertIntoPage: %w", err)
+	}
+	n, err := t.file.Write(buf.Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("Table.insertIntoPage: file.Write: %w", err)
+	}
+	if n != buf.Len() {
+		return nil, columnio.NewIncompleteWriteError(buf.Len(), n)
+	}
+
+	// seek back to the beginning of page
+	if _, err = t.file.Seek(page.StartPos, io.SeekStart); err != nil {
+		return nil, fmt.Errorf("Table.insertIntoPage: file.Seek: %w", err)
+	}
+	return page, t.updatePageSize(page.StartPos, int32(buf.Len()))
+}
+
+func (t *Table) seekToNextPage(lenToFit uint32) (*index.Page, error) {
+	if _, err := t.file.Seek(0, io.SeekStart); err != nil {
+		return nil, fmt.Errorf("Table.seekToNextPage: %w", err)
+	}
+
+	for {
+		err := t.seekUntil(types.TypeByte)
+		if err != nil {
+			if err == io.EOF {
+				return t.insertEmptyPage()
+			}
+			return nil, fmt.Errorf("Table.seekToNextPage: %w", err)
+		}
+
+		// Skipping the type definition byte
+		if _, err = t.reader.ReadByte(); err != nil {
+			return nil, fmt.Errorf("Table.seekToNextPage: readByte: %w", err)
+		}
+		currPageLen, err := t.reader.ReadUint32()
+		if err != nil {
+			return nil, fmt.Errorf("Table.seekToNextPage: readUint32: %w", err)
+		}
+
+		if currPageLen+lenToFit <= PageSize {
+			meta := int64(types.LenByte + types.LenInt32)
+			pagePos, err := t.file.Seek(-1*meta, io.SeekCurrent)
+			if err != nil {
+				return nil, fmt.Errorf("Table.seekToNextPage: file.Seek: %w", err)
+			}
+			// This line is very important
+			_, err = t.file.Seek(int64(currPageLen)+meta, io.SeekCurrent)
+			return index.NewPage(pagePos), err
+		}
+	}
+}
+
+func (t *Table) insertEmptyPage() (*index.Page, error) {
+	buf := bytes.Buffer{}
+
+	// type
+	if err := binary.Write(&buf, binary.LittleEndian, types.TypePage); err != nil {
+		return nil, fmt.Errorf("Table.insertEmptyPage: type: %w", err)
+	}
+
+	// length
+	if err := binary.Write(&buf, binary.LittleEndian, uint32(0)); err != nil {
+		return nil, fmt.Errorf("Table.insertEmptyPage: len: %w", err)
+	}
+
+	n, err := t.file.Write(buf.Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("Table.insertEmptyPage: file.Write: %w", err)
+	}
+	if n != buf.Len() {
+		return nil, columnio.NewIncompleteWriteError(buf.Len(), n)
+	}
+
+	currPos, err := t.file.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return nil, fmt.Errorf("Table.insertEmptyPage: %w", err)
+	}
+	// startPos should point at the very first byte, that is types.TypePage and 5 bytes before the current pos
+	startPos := currPos - (types.LenInt32 + types.LenByte)
+	if startPos <= 0 {
+		return nil, fmt.Errorf("Table.insertEmptyPage: unable to insert new page: start should be positive: %d", startPos)
+	}
+	return index.NewPage(startPos), nil
 }

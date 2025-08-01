@@ -49,6 +49,13 @@ func CreateDatabase(name string) (*Database, error) {
 	}, nil
 }
 
+func DropDatabase(name string) error {
+	if err := os.RemoveAll(path(name)); err != nil {
+		return fmt.Errorf("DropDatabase: %w", err)
+	}
+	return nil
+}
+
 func NewDatabase(name string) (*Database, error) {
 	if !exists(name) {
 		return nil, NewDatabaseDoesNotExistError(name)
