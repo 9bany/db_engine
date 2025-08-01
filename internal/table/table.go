@@ -127,7 +127,6 @@ func (t *Table) WriteColumnDefinitions(w io.Writer) error {
 		if err != nil {
 			return fmt.Errorf("Table.WriteColumnDefinitions: %w", err)
 		}
-		fmt.Println(b)
 		writer := columnio.NewColumnDefinitionWriter(w)
 		if n, err := writer.Write(b); n < len(b) || err != nil {
 			return fmt.Errorf("Table.WriteColumnDefinitions: %w", err)
