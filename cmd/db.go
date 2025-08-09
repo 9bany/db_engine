@@ -48,6 +48,21 @@ func fakeTbUser(dbName string) error {
 	return nil
 }
 
+func fakeInsertTbUser(dbName string) error {
+	db, err := internal.NewDatabase(dbName)
+	if err != nil {
+		return err
+	}
+	_, err = db.Tables["tb_user"].Insert(map[string]interface{}{
+		"id": int32(1),
+		"username": "bany",
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func init() {
 
 	createDbCmd.PersistentFlags().StringVarP(&Database, "database_name", "d", "", "Database name")
@@ -58,6 +73,9 @@ func init() {
 
 	fakeTbCmd.PersistentFlags().StringVarP(&Database, "database_name", "d", "", "Database name")
 	databaseCmd.AddCommand(fakeTbCmd)
+
+	fakeInsertTbCmd.PersistentFlags().StringVarP(&Database, "database_name", "d", "", "Database name")
+	databaseCmd.AddCommand(fakeInsertTbCmd)
 
 	rootCmd.AddCommand(databaseCmd)
 }
@@ -111,5 +129,20 @@ var fakeTbCmd = &cobra.Command{
 			log.Fatal(err)
 		}
 		fmt.Printf("Created tb_user in database: %s\n", Database)
+	},
+}
+
+var fakeInsertTbCmd = &cobra.Command{
+	Use:   "fake-insert",
+	Short: "Fake a table in database",
+	Long:  ``,
+	Run: func(cmd *cobra.Command, args []string) {
+		if len(Database) == 0 {
+			os.Exit(0)
+		}
+		if err := fakeInsertTbUser(Database); err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println("Inserted into tb_user")
 	},
 }
